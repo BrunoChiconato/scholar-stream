@@ -170,6 +170,9 @@ poetry.toml
 # LSP config files
 pyrightconfig.json
 
+docgen.py
+source_code.md
+
 ### Terraform ###
 # Local .terraform directories
 **/.terraform/*
@@ -205,3 +208,9 @@ override.tf.json
 # Ignore CLI configuration files
 .terraformrc
 terraform.rc
+
+# Keys generated for Firehose loader
+.keys/
+
+# Rendered SQL containing public key
+sql/06_link_public_key.sql
