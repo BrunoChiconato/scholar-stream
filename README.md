@@ -103,8 +103,8 @@ flowchart LR
 ### 2) Clone & set up the environment
 
 ```bash
-git clone https://github.com/<your-user>/scholarstream.git
-cd scholarstream
+git clone https://github.com/BrunoChiconato/scholar-stream.git
+cd scholar-stream
 
 python -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
