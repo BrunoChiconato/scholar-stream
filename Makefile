@@ -63,6 +63,14 @@ sql-check: ## Check Snowflake env for SQL apply (.env)
 	@test -n "$(SNOWFLAKE_USER)"    || { echo "ERROR: SNOWFLAKE_USER missing in .env"; exit 2; }
 	@test -n "$(SNOWFLAKE_PASSWORD)"|| { echo "ERROR: SNOWFLAKE_PASSWORD missing in .env"; exit 2; }
 
+sql-apply: sql-check ## Apply SQL 01..05 (use FILE/FILES/ARGS to filter)
+	@echo ">> Applying SQL scripts..."
+	@if [ -n "$(FILE)" ] || [ -n "$(FILES)" ]; then \
+	  $(PYTHON) $(SQL_DIR)/apply.py --files $${FILES:-$(FILE)} $(ARGS) ; \
+	else \
+	  $(PYTHON) $(SQL_DIR)/apply.py --files $(SQL_CORE_FILES) $(ARGS) ; \
+	fi
+
 lint: ## Lint Python code with Ruff
 	ruff format . && ruff check .
 
@@ -155,3 +163,6 @@ send-test: env-check ## Send one NDJSON record to Firehose (explicit base64)
 	    --delivery-stream-name "$(FIREHOSE_NAME)" \
 	    --record Data=$$B64 \
 	    --region "$(AWS_REGION)"
+
+run-producer: ## Run the Python producer (OpenAlex -> Firehose)
+	$(PYTHON) -m ingestion.producer run --batch-size 50 --batch-sleep 1
