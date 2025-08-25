@@ -22,19 +22,45 @@ SQL_CORE_FILES := $(notdir $(wildcard $(SQL_DIR)/0[1-5]_*.sql))
 help:
 	@printf "\n\033[1mScholarStream Make Targets\033[0m\n\n"
 	@awk 'BEGIN { FS=":.*## " } \
-	     /^[A-Za-z0-9_./-]+:.*##/ { printf "  \033[36m%-26s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
-	@printf "\n\033[1mRequired .env keys\033[0m\n"
-	@printf "  AWS:       AWS_REGION, SECRET_NAME\n"
-	@printf "  Firehose:  FIREHOSE_NAME (optional default ok)\n"
-	@printf "  Snowflake (dest): SNOWFLAKE_ACCOUNT_URL, FIREHOSE_SNOWFLAKE_USER\n"
-	@printf "  Snowflake (apply): SNOWFLAKE_ACCOUNT, SNOWFLAKE_USER, SNOWFLAKE_PASSWORD, SNOWFLAKE_DATABASE\n\n"
-	@printf "\033[1mTypical flow\033[0m\n"
-	@printf "  1) make env-show                  # inspect loaded env\n"
-	@printf "  2) make bootstrap-identity-secure # create/link RSA key & write secret (once)\n"
-	@printf "  3) make tf-init                   # terraform init\n"
-	@printf "  4) make tf-plan                   # plan\n"
-	@printf "  5) make tf-apply                  # apply\n"
-	@printf "  6) make send-test                 # push one test record through Firehose\n\n"
+	     /^[A-Za-z0-9_./-]+:.*##/ { printf "  \033[36m%-28s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
+
+	@printf "\n\033[1m.env keys (grouped)\033[0m\n"
+	@printf "  \033[1m[AWS / Infra]\033[0m\n"
+	@printf "    AWS_REGION                (Required)                         # AWS region used by CLI/Terraform\n"
+	@printf "    SECRET_NAME               (Required)                         # Secrets Manager name that stores the Snowflake keypair\n"
+	@printf "    FIREHOSE_NAME             (Default: scholarstream-openalex)  # Firehose delivery stream\n"
+	@printf "    SNOWFLAKE_ACCOUNT_URL     (Required)                         # Public Snowflake URL (e.g., <acct>.<region>.snowflakecomputing.com)\n"
+	@printf "    FIREHOSE_SNOWFLAKE_USER   (Required)                         # Snowflake service user used by Firehose\n"
+	@printf "    KEY_DIR                   (Default: .keys)                   # Where RSA keys are generated (bootstrap)\n"
+
+	@printf "  \033[1m[Snowflake — SQL/App]\033[0m\n"
+	@printf "    SNOWFLAKE_ACCOUNT         (Required for sql-apply)\n"
+	@printf "    SNOWFLAKE_USER            (Required for sql-apply)\n"
+	@printf "    SNOWFLAKE_PASSWORD        (Required for sql-apply)\n"
+	@printf "    SNOWFLAKE_ROLE            (Default: R_ANALYST)        # Optional session role\n"
+	@printf "    SNOWFLAKE_WAREHOUSE       (Default: WH_INGESTION_XS)  # Session warehouse\n"
+	@printf "    SNOWFLAKE_DATABASE        (Default: SCHOLARSTREAM)\n"
+	@printf "    SNOWFLAKE_SCHEMA          (Default: CURATED)          # App reads from CURATED\n"
+	@printf "    SNOWFLAKE_SCHEMA_RAW      (Default: RAW)              # RAW schema for ingestion\n"
+	@printf "    SNOWFLAKE_TABLE           (Default: OPENALEX_EVENTS)\n"
+
+	@printf "  \033[1m[OpenAlex / Producer]\033[0m\n"
+	@printf "    OPENALEX_EMAIL            (Required)                  # Contact email for API politeness\n"
+	@printf "    OPENALEX_BASE_URL         (Default: https://api.openalex.org)\n"
+	@printf "    PRODUCER_BATCH_SIZE       (Default: 50)\n"
+	@printf "    PRODUCER_SLEEP_SECONDS    (Default: 2)\n"
+	@printf "    SOURCE_TAG                (Default: openalex)\n"
+
+	@printf "\n\033[1mTypical flow\033[0m\n"
+	@printf "  1) make env-check                  # tools present + core env required for infra\n"
+	@printf "  2) make sql-check                  # validate Snowflake credentials for SQL apply\n"
+	@printf "  3) make sql-apply                  # create DB/roles/tables/views/masking\n"
+	@printf "  4) make bootstrap-identity-secure  # generate RSA key, convert to PKCS#8, store secret JSON\n"
+	@printf "  5) make tf-init                    # terraform init\n"
+	@printf "  6) make tf-plan                    # generate infra plan (Firehose -> Snowflake)\n"
+	@printf "  7) make tf-apply                   # apply infrastructure\n"
+	@printf "  8) make send-test                  # send 1 NDJSON record via Firehose\n"
+	@printf "  9) make run-producer               # start OpenAlex producer -> Firehose\n\n"
 
 env-show: ## Show key .env values (sanity check)
 	@echo "AWS_REGION=$(AWS_REGION)"
