@@ -8,7 +8,7 @@ SELECT
     r.RECORD:id::string AS work_id,
     r.RECORD:doi::string AS doi,
     r.RECORD:title::string AS title,
-    TRY_TO_NUMBER(r.RECORD:publication_year) AS publication_year,
+    TRY_TO_NUMBER(TO_VARCHAR(r.RECORD:publication_year)) AS publication_year,
     r.RECORD:host_venue:display_name::string AS venue, 
     r.RECORD:authorships[0]:author:display_name::string AS primary_author,  
     r.RECORD:email::string AS email, 
