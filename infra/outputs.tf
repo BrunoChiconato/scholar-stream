@@ -19,6 +19,6 @@ output "cloudwatch_log_group" {
 }
 
 output "secret_arn" {
-  value       = var.create_secret ? aws_secretsmanager_secret.snowflake[0].arn : null
+  value       = (var.create_secret && var.secret_arn == "" && length(aws_secretsmanager_secret.snowflake) > 0) ? aws_secretsmanager_secret.snowflake[0].arn : null
   description = "Secrets Manager secret ARN (if created)"
 }

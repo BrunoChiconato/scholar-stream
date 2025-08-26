@@ -109,7 +109,7 @@ jobs:
 
       - name: Terraform plan (no-cred, offline)
         run: |
-          terraform -chdir=infra plan -no-color -out=tfplan.bin \
+          terraform -chdir=infra plan -no-color -out=tfplan.bin -refresh=false \
             -var="aws_region=${{ vars.AWS_REGION }}" \
             -var="snowflake_account_url=${{ vars.SNOWFLAKE_ACCOUNT_URL }}" \
             -var="snowflake_user=${{ vars.FIREHOSE_SNOWFLAKE_USER }}" \
@@ -118,7 +118,7 @@ jobs:
             -var="snowflake_table=${{ vars.SNOWFLAKE_TABLE }}" \
             -var="secret_arn=${{ vars.SECRET_ARN }}" \
             -var="offline_mode=true" \
-            -refresh=false
+            -var="create_secret=false"
 
       - name: Plan summary + artifacts
         run: |
