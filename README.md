@@ -3,6 +3,9 @@ _A compact, production-minded pipeline that streams OpenAlex works into Snowflak
 
 [![CI](https://github.com/BrunoChiconato/scholar-stream/actions/workflows/ci.yml/badge.svg)](https://github.com/BrunoChiconato/scholar-stream/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/BrunoChiconato/scholar-stream/graph/badge.svg?token=LKDFIBDLE5)](https://codecov.io/gh/BrunoChiconato/scholar-stream)
+![Snowflake](https://img.shields.io/badge/Snowflake-Data%20Cloud-29B5E8?logo=snowflake&logoColor=white)
+![AWS Firehose](https://img.shields.io/badge/AWS-Firehose-FF9900?logo=amazon-aws&logoColor=white)
+
 
 ## Description
 
@@ -13,7 +16,6 @@ _A compact, production-minded pipeline that streams OpenAlex works into Snowflak
 - Firehose writes into **Snowflake RAW** (VARIANT payload + metadata); **CURATED** views project analytics-friendly columns and compute end-to-end latency.
 - A **Streamlit** app shows live latency metrics and recent rows.
 - **Terraform** stands up Firehose + IAM + CloudWatch + S3 backup; **SQL** sets up DB/roles/views/masking.
-
 
 ## Highlights
 - ⚡ **Near-real-time** ingestion with simple batching
@@ -89,10 +91,64 @@ flowchart LR
 
 ## Tech Stack
 
-* **Python 3.12+** · **Streamlit** · **Typer / Rich**
+* **Python 3.12+**
 * **AWS**: Kinesis Data Firehose, CloudWatch, S3
 * **Snowflake**: RAW (VARIANT), CURATED views, RBAC, dynamic masking
-* **Terraform** (AWS provider) · **Makefile** helpers
+* **Terraform** (AWS provider)
+* **Makefile** helpers
+
+## File Structure
+
+```text
+.
+└── .env.example
+└── .github
+    └── workflows
+        └── ci.yml
+└── Makefile
+└── README.md
+└── media
+    └── 01_dashboard_admin_unmasked.png
+    └── 02_dashboard_analyst_masked.png
+└── app
+    └── home.py
+└── infra
+    └── README.md
+    └── main.tf
+    └── outputs.tf
+    └── variables.tf
+└── ingestion
+    └── __init__.py
+    └── config.py
+    └── firehose_client.py
+    └── openalex_client.py
+    └── producer.py
+    └── schema.py
+    └── utils.py
+└── pyproject.toml
+└── requirements-ci.txt
+└── sql
+    └── 00_service_user.sql
+    └── 01_init_snowflake.sql
+    └── 02_rbac_policies.sql
+    └── 03_tables_raw.sql
+    └── 04_views_curated.sql
+    └── 05_masking_policy.sql
+    └── 06_link_public_key.sql
+    └── apply.py
+    └── bootstrap_firehose_identity_secure.sh
+└── tests
+    └── conftest.py
+    └── integration
+        └── test_producer_flow.py
+    └── unit
+        └── test_config.py
+        └── test_firehose_client.py
+        └── test_openalex_client.py
+        └── test_producer_unit.py
+        └── test_schema.py
+        └── test_utils.py
+```
 
 ## Getting Started
 
@@ -194,12 +250,25 @@ Open the sidebar, confirm connection details (role/warehouse/database/schema), a
 
 ```sql
 -- Latency over the last 5 minutes
-SELECT * FROM SCHOLARSTREAM.CURATED.VW_LATENCY;
+SELECT
+  *
+FROM
+  SCHOLARSTREAM.CURATED.VW_LATENCY;
 
 -- Most recent works
-SELECT WORK_ID, TITLE, PRIMARY_AUTHOR, PUBLICATION_YEAR, EMAIL, EVENT_TS, LANDED_TS, LATENCY_SECONDS
-FROM SCHOLARSTREAM.CURATED.VW_WORKS
-ORDER BY LANDED_TS DESC
+SELECT
+  WORK_ID,
+  TITLE,
+  PRIMARY_AUTHOR,
+  PUBLICATION_YEAR,
+  EMAIL,
+  EVENT_TS,
+  LANDED_TS,
+  LATENCY_SECONDS
+FROM
+  SCHOLARSTREAM.CURATED.VW_WORKS
+ORDER BY
+  LANDED_TS DESC
 LIMIT 20;
 ```
 
@@ -217,88 +286,42 @@ make send-test                # send one NDJSON record
 make run-producer             # start producer with defaults
 ```
 
-## Configuration (.env example)
+## Latency SLOs (dev)
 
-```env
-# Core AWS/Firehose (Ingestion)
-AWS_REGION=us-east-1
-FIREHOSE_NAME=scholarstream-openalex
-SECRET_NAME=scholarstream/snowflake/firehose
+**SLO (rolling 5 min window):** **p50 ≤ 20s**, **p95 ≤ 60s**.
 
-# OpenAlex
-OPENALEX_BASE_URL=https://api.openalex.org
-OPENALEX_EMAIL=your-email+scholarstream@example.com
+**How it’s calculated.** Latency is measured as `LANDED_TS - EVENT_TS` for each record. SLOs are checked over a rolling 5-minute window using the curated latency view.
 
-# Producer configs
-PRODUCER_BATCH_SIZE=50
-PRODUCER_SLEEP_SECONDS=2
-SOURCE_TAG=openalex
+## Buffering trade-offs (Firehose to Snowflake)
 
-# Snowflake (Streamlit app + SQL/apply)
-SNOWFLAKE_ACCOUNT=xxxxxx-xxxxxxxx
-SNOWFLAKE_USER=your_user
-SNOWFLAKE_PASSWORD=your_password
-SNOWFLAKE_ROLE=R_ANALYST
-SNOWFLAKE_WAREHOUSE=WH_INGESTION_XS
-SNOWFLAKE_DATABASE=SCHOLARSTREAM
-SNOWFLAKE_SCHEMA=CURATED
-SNOWFLAKE_TABLE=OPENALEX_EVENTS
-SNOWFLAKE_SCHEMA_RAW=RAW
-SNOWFLAKE_SCHEMA_CURATED=CURATED
+Choosing Firehose buffer **size** and **interval** affects end-to-end latency and cost. Below are two practical presets:
 
-# (Infra/Terraform) Public account URL
-SNOWFLAKE_ACCOUNT_URL=xy12345.sa-east-1.snowflakecomputing.com
+| Profile                 | Buffer size (MB) | Buffer interval (s) | Expected p50 | Expected p95 | Notes                                                            |
+| ----------------------- | ---------------- | ------------------- | ------------ | ------------ | ---------------------------------------------------------------- |
+| **Demo (low latency)**  | 1                | 1–2                 | 5–10s        | 20–40s       | Snappy feedback for demos; more frequent micro-batches.          |
+| **Dev (cost-friendly)** | 2–4              | 5–10                | 15–20s       | 45–60s       | Fewer deliveries reduce API/compute overhead while meeting SLOs. |
 
-# Local keys (identity bootstrap)
-KEY_DIR=.keys
+**Reliability note.** Firehose automatically retries failed deliveries and stores undeliverable records in the configured **S3 backup** prefix for later replay/forensics. Each delivery into Snowflake is a **micro-batch**, which adds small, fixed overhead per commit—smaller buffers improve freshness but increase commit frequency (and thus overhead).
 
-# Firehose service user
-FIREHOSE_SNOWFLAKE_USER=FIREHOSE_INGESTOR
-```
+## Screenshots
 
-## File Structure
+### Quick demo
 
-```text
-.
-├── app
-│   └── home.py
-├── infra
-│   ├── main.tf
-│   ├── outputs.tf
-│   ├── README.md
-│   └── variables.tf
-├── ingestion
-│   ├── config.py
-│   ├── firehose_client.py
-│   ├── __init__.py
-│   ├── openalex_client.py
-│   ├── producer.py
-│   ├── schema.py
-│   └── utils.py
-├── Makefile
-├── pyproject.toml
-├── README.md
-├── .gitignore
-├── .python-version
-├── .env.example
-├── .env
-├── sql
-│   ├── 00_service_user.sql
-│   ├── 01_init_snowflake.sql
-│   ├── 02_rbac_policies.sql
-│   ├── 03_tables_raw.sql
-│   ├── 04_views_curated.sql
-│   ├── 05_masking_policy.sql
-│   ├── 06_link_public_key.sql
-│   ├── 06_link_public_key.sql.tmpl
-│   ├── apply.py
-│   └── bootstrap_firehose_identity_secure.sh
-└── uv.lock
-```
+* **Admin (ACCOUNTADMIN)**: emails are **visible (unmasked)** — demonstrates full-access role.
+
+  ![Admin view - Email unmasked](./media/01_dashboard_admin_unmasked.png)
+
+* **Analyst (R_ANALYST)**: emails are **masked** by the dynamic masking policy — demonstrates governance in action.
+
+  ![Analyst view - Email masked](./media/02_dashboard_analyst_masked.png)
+
+## CI/CD
+
+A GitHub Actions pipeline lint-checks, runs tests/coverage, and produces a Terraform **plan (offline)** artifact for infra changes. Coverage is published to Codecov (badge above).
 
 ## Troubleshooting
 
-* **Missing deps in app:** `snowflake-connector-python` is required by `app/home.py`. Ensure the `snowflake` package is installed.
-* **Producer errors:** Check AWS credentials/region and that `FIREHOSE_NAME` exists.
-* **Firehose failures:** Inspect CloudWatch Logs and the S3 backup prefix for error samples.
-* **Masking not applied:** Confirm the masking policy script ran and you’re querying as an analyst role.
+* **App dependency**: `snowflake-connector-python` is required by `app/home.py`. Ensure the `snowflake` package is installed.
+* **Producer errors**: check AWS credentials/region and that `FIREHOSE_NAME` exists.
+* **Firehose failures**: inspect CloudWatch Logs and the S3 error prefix.
+* **Masking not applied**: confirm the masking policy ran and you’re querying as an analyst role.
