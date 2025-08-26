@@ -110,6 +110,7 @@ jobs:
       - name: Terraform plan (no AWS calls)
         run: |
           terraform -chdir=infra plan -no-color -out=tfplan.bin -refresh=false \
+            -var "offline_mode=true" \
             -var "aws_region=${AWS_REGION}" \
             -var "s3_backup_bucket=scholarstream-plan-ci" \
             -var "create_secret=false" \
