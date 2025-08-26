@@ -107,20 +107,18 @@ jobs:
       - name: Terraform validate
         run: terraform -chdir=infra validate
 
-      - name: Terraform plan (no AWS calls)
+      - name: Terraform plan (no-cred, offline)
         run: |
-          terraform -chdir=infra plan -no-color -out=tfplan.bin -refresh=false \
-            -var "offline_mode=true" \
-            -var "aws_region=${AWS_REGION}" \
-            -var "s3_backup_bucket=scholarstream-plan-ci" \
-            -var "create_secret=false" \
-            -var "secret_arn=${SECRET_ARN}" \
-            -var "firehose_name=${FIREHOSE_NAME}" \
-            -var "snowflake_account_url=${SNOWFLAKE_ACCOUNT_URL}" \
-            -var "snowflake_user=${FIREHOSE_SNOWFLAKE_USER}" \
-            -var "snowflake_database=${SNOWFLAKE_DATABASE}" \
-            -var "snowflake_schema=${SNOWFLAKE_SCHEMA_RAW}" \
-            -var "snowflake_table=${SNOWFLAKE_TABLE}"
+          terraform -chdir=infra plan -no-color -out=tfplan.bin \
+            -var="aws_region=${{ vars.AWS_REGION }}" \
+            -var="snowflake_account_url=${{ vars.SNOWFLAKE_ACCOUNT_URL }}" \
+            -var="snowflake_user=${{ vars.FIREHOSE_SNOWFLAKE_USER }}" \
+            -var="snowflake_database=${{ vars.SNOWFLAKE_DATABASE }}" \
+            -var="snowflake_schema=${{ vars.SNOWFLAKE_SCHEMA_RAW }}" \
+            -var="snowflake_table=${{ vars.SNOWFLAKE_TABLE }}" \
+            -var="secret_arn=${{ vars.SECRET_ARN }}" \
+            -var="offline_mode=true" \
+            -refresh=false
 
       - name: Plan summary + artifacts
         run: |

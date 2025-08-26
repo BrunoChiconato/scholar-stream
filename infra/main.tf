@@ -17,13 +17,18 @@ provider "aws" {
   skip_requesting_account_id  = var.offline_mode
 }
 
-data "aws_caller_identity" "current" {}
+data "aws_caller_identity" "current" {
+  count = var.offline_mode ? 0 : 1
+}
 data "aws_region" "current" {}
 
 locals {
-  project           = var.project_name
-  name_prefix       = "${var.project_name}-${var.env}"
-  backup_bucket     = var.s3_backup_bucket != "" ? var.s3_backup_bucket : "scholarstream-firehose-backup-${data.aws_caller_identity.current.account_id}-${var.aws_region}"
+  project     = var.project_name
+  name_prefix = "${var.project_name}-${var.env}"
+
+  account_id_safe = var.offline_mode ? "000000000000" : data.aws_caller_identity.current[0].account_id
+
+  backup_bucket     = var.s3_backup_bucket != "" ? var.s3_backup_bucket : "scholarstream-firehose-backup-${local.account_id_safe}-${var.aws_region}"
   firehose_name     = var.firehose_name != "" ? var.firehose_name : "scholarstream-openalex"
   cw_log_group_name = "/aws/kinesisfirehose/${local.firehose_name}"
   secret_arn        = var.secret_arn != "" ? var.secret_arn : (var.create_secret ? aws_secretsmanager_secret.snowflake[0].arn : "")
