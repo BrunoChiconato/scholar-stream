@@ -95,8 +95,10 @@ jobs:
 
       - name: Select/Create workspace
         run: |
-          terraform -chdir=infra workspace select "${TF_WORKSPACE}" || \
-          terraform -chdir=infra workspace new "${TF_WORKSPACE}"
+          WS="${TF_WORKSPACE:-dev}"
+          unset TF_WORKSPACE
+          terraform -chdir=infra workspace list >/dev/null 2>&1 || terraform -chdir=infra init -input=false
+          terraform -chdir=infra workspace select "$WS" || terraform -chdir=infra workspace new "$WS"
 
       - name: Terraform validate
         run: terraform -chdir=infra validate
