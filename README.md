@@ -1,6 +1,9 @@
 # ScholarStream — Real-time OpenAlex to Snowflake via AWS Firehose
 _A compact, production-minded pipeline that streams OpenAlex works into Snowflake (RAW to CURATED) with a minimal Streamlit dashboard and Terraform-provisioned Firehose._
 
+[![CI](https://github.com/BrunoChiconato/scholar-stream/actions/workflows/ci.yml/badge.svg)](https://github.com/BrunoChiconato/scholar-stream/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/BrunoChiconato/scholar-stream/graph/badge.svg?token=LKDFIBDLE5)](https://codecov.io/gh/BrunoChiconato/scholar-stream)
+
 ## Description
 
 **Problem.** Spinning up a realistic, governed, and observable “events to warehouse” pipeline is often slow and ad-hoc.
