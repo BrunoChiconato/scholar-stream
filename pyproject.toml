@@ -5,8 +5,13 @@ description = "Scholar Stream Project"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "boto3>=1.40.16",
     "pandas>=2.3.2",
+    "pydantic>=2.11.7",
+    "pytest>=8.4.1",
+    "pytest-cov>=6.2.1",
     "python-dotenv>=1.1.1",
+    "requests>=2.32.5",
     "rich>=14.1.0",
     "ruff>=0.12.10",
     "snowflake>=1.7.0",
