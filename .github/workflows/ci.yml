@@ -75,6 +75,10 @@ jobs:
     env:
       TF_IN_AUTOMATION: "true"
       TF_WORKSPACE: "dev"
+      AWS_ACCESS_KEY_ID: CI_DUMMY_KEY
+      AWS_SECRET_ACCESS_KEY: CI_DUMMY_SECRET
+      AWS_SESSION_TOKEN: CI_DUMMY_TOKEN
+      AWS_EC2_METADATA_DISABLED: "true"
       AWS_REGION: ${{ vars.AWS_REGION }}
       SECRET_ARN: ${{ vars.SECRET_ARN }}
       FIREHOSE_NAME: ${{ vars.FIREHOSE_NAME }}
@@ -105,7 +109,9 @@ jobs:
 
       - name: Terraform plan (no AWS calls)
         run: |
-          terraform -chdir=infra plan -no-color -out=tfplan.bin \
+          terraform -chdir=infra plan -no-color -out=tfplan.bin -refresh=false \
+            -var "aws_region=${AWS_REGION}" \
+            -var "s3_backup_bucket=scholarstream-plan-ci" \
             -var "create_secret=false" \
             -var "secret_arn=${SECRET_ARN}" \
             -var "firehose_name=${FIREHOSE_NAME}" \
