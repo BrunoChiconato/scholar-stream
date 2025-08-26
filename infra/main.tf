@@ -10,7 +10,11 @@ terraform {
 }
 
 provider "aws" {
-  region = var.aws_region
+  region                      = var.aws_region
+  skip_credentials_validation = var.offline_mode
+  skip_metadata_api_check     = var.offline_mode
+  skip_region_validation      = var.offline_mode
+  skip_requesting_account_id  = var.offline_mode
 }
 
 data "aws_caller_identity" "current" {}
@@ -25,7 +29,6 @@ locals {
   secret_arn        = var.secret_arn != "" ? var.secret_arn : (var.create_secret ? aws_secretsmanager_secret.snowflake[0].arn : "")
 }
 
-# -------------------- S3 (backup for failed records) --------------------
 resource "aws_s3_bucket" "firehose_backup" {
   bucket        = local.backup_bucket
   force_destroy = true
@@ -49,7 +52,6 @@ resource "aws_s3_bucket_versioning" "firehose_backup" {
   versioning_configuration { status = "Enabled" }
 }
 
-# -------------------- CloudWatch Logs --------------------
 resource "aws_cloudwatch_log_group" "firehose" {
   name              = local.cw_log_group_name
   retention_in_days = 14
@@ -60,7 +62,6 @@ resource "aws_cloudwatch_log_stream" "firehose" {
   log_group_name = aws_cloudwatch_log_group.firehose.name
 }
 
-# -------------------- IAM for Firehose --------------------
 data "aws_iam_policy_document" "assume" {
   statement {
     effect = "Allow"
@@ -131,20 +132,17 @@ resource "aws_iam_role_policy" "firehose" {
   policy = data.aws_iam_policy_document.inline.json
 }
 
-# -------------------- Secret (optional) --------------------
 resource "aws_secretsmanager_secret" "snowflake" {
   count      = var.create_secret && var.secret_arn == "" ? 1 : 0
   name       = var.secret_name
   kms_key_id = var.secret_kms_key_arn != "" ? var.secret_kms_key_arn : null
 }
 
-# -------------------- Firehose -> Snowflake (PUBLIC) --------------------
 resource "aws_kinesis_firehose_delivery_stream" "this" {
   name        = local.firehose_name
   destination = "snowflake"
 
   snowflake_configuration {
-    # PUBLIC account URL, e.g.: hac34976.us-east-1.aws.snowflakecomputing.com
     account_url = var.snowflake_account_url
     user        = var.snowflake_user
     role_arn    = aws_iam_role.firehose.arn
@@ -157,10 +155,8 @@ resource "aws_kinesis_firehose_delivery_stream" "this" {
     content_column_name  = var.content_column_name
     metadata_column_name = var.metadata_column_name
 
-    # Retry duration in seconds (0-7200)
     retry_duration = var.snowflake_retry_seconds
 
-    # Optional: force a specific Snowflake role (otherwise user's default is used)
     dynamic "snowflake_role_configuration" {
       for_each = var.snowflake_role != "" ? [1] : []
       content {
@@ -174,7 +170,6 @@ resource "aws_kinesis_firehose_delivery_stream" "this" {
       log_stream_name = aws_cloudwatch_log_stream.firehose.name
     }
 
-    # S3 backup for failed records
     s3_backup_mode = "FailedDataOnly"
     s3_configuration {
       role_arn            = aws_iam_role.firehose.arn
@@ -192,7 +187,6 @@ resource "aws_kinesis_firehose_delivery_stream" "this" {
       }
     }
 
-    # Secrets Manager for credentials
     secrets_manager_configuration {
       enabled    = true
       secret_arn = local.secret_arn

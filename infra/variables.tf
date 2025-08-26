@@ -103,3 +103,9 @@ variable "secret_arn" {
   type        = string
   default     = ""
 }
+
+variable "offline_mode" {
+  description = "Skip AWS credentials/account/metadata checks (plan-only in CI)"
+  type        = bool
+  default     = false
+}
